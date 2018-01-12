@@ -9,3 +9,7 @@
 
 #define		CHESS_H_NUM		19
 #define		CHESS_V_NUM		11
+
+
+#define		GAME_TIMER			4444		///开局定时器
+#define		GAME_PLAY_TIMER			4445		///游戏进行定时器

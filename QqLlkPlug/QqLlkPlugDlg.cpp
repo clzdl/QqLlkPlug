@@ -53,6 +53,10 @@ END_MESSAGE_MAP()
 CQqLlkPlugDlg::CQqLlkPlugDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(IDD_QQLLKPLUG_DIALOG, pParent)
 	, m_autoStart(FALSE)
+	, m_gameTop(FALSE)
+	, m_speed(FALSE)
+	, m_gameSpeed(1000)
+	, m_autoHangUp(FALSE)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -62,6 +66,11 @@ void CQqLlkPlugDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Check(pDX, IDC_CHK_STARTGAME, m_autoStart);
 	DDX_Control(pDX, IDC_BTN_STARTGAME, m_btnStartGame);
+	DDX_Check(pDX, IDC_CHK_GAMETOP, m_gameTop);
+	DDX_Check(pDX, IDC_CHK_SPEED, m_speed);
+	DDX_Control(pDX, IDC_SLIDER_SPEED, m_sliderSpeed);
+	DDX_Control(pDX, IDC_CHK_SPEED, m_ctrlSpeed);
+	DDX_Check(pDX, IDC_CHK_HANG_UP, m_autoHangUp);
 }
 
 BEGIN_MESSAGE_MAP(CQqLlkPlugDlg, CDialogEx)
@@ -72,6 +81,14 @@ BEGIN_MESSAGE_MAP(CQqLlkPlugDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_READSTARTFLAG, &CQqLlkPlugDlg::OnBnClickedBtnReadstartflag)
 	ON_BN_CLICKED(IDC_BTN_READCHESSDATA, &CQqLlkPlugDlg::OnBnClickedBtnReadchessdata)
 	ON_BN_CLICKED(IDC_BTN_SINGLECLEAR, &CQqLlkPlugDlg::OnBnClickedBtnSingleclear)
+	ON_BN_CLICKED(IDC_BTN_READCHESSNUMBER, &CQqLlkPlugDlg::OnBnClickedBtnReadchessnumber)
+	ON_BN_CLICKED(IDC_BTN_COUNTDOWN, &CQqLlkPlugDlg::OnBnClickedBtnCountdown)
+	ON_BN_CLICKED(IDC_CHK_GAMETOP, &CQqLlkPlugDlg::OnBnClickedChkGametop)
+	ON_BN_CLICKED(IDC_CHK_SPEED, &CQqLlkPlugDlg::OnBnClickedChkSpeed)
+	ON_NOTIFY(NM_RELEASEDCAPTURE, IDC_SLIDER_SPEED, &CQqLlkPlugDlg::OnNMReleasedcaptureSliderSpeed)
+	ON_BN_CLICKED(IDC_CHK_HANG_UP, &CQqLlkPlugDlg::OnBnClickedChkHangUp)
+	ON_WM_TIMER()
+	ON_BN_CLICKED(IDC_CHK_STARTGAME, &CQqLlkPlugDlg::OnBnClickedChkStartgame)
 END_MESSAGE_MAP()
 
 
@@ -107,8 +124,13 @@ BOOL CQqLlkPlugDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO: 在此添加额外的初始化代码
+	//MoveWindow(0, 0, 600, 500, true);
+	//SetWindowPos(NULL, 0, 0, 600, 500, SWP_SHOWWINDOW| SWP_NOZORDER);
+	m_sliderSpeed.SetRange(100,5000);
+	m_sliderSpeed.SetTicFreq(150);
+	m_sliderSpeed.SetPos(1000);
+	m_ctrlSpeed.SetCheck(true);
 	
-
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -216,6 +238,7 @@ void CQqLlkPlugDlg::StartGame()
 	Sleep(200);
 
 	::SetCursorPos(lastCurPoint.x, lastCurPoint.y);
+
 }
 
 
@@ -488,4 +511,200 @@ void CQqLlkPlugDlg::OnBnClickedBtnSingleclear()
 		return;
 	}
 	ClearPair();
+}
+
+DWORD CQqLlkPlugDlg::GetChessDataNum()
+{
+	HWND  hwndLlk = FindQqLlkWindows();
+	if(NULL == hwndLlk)
+	{
+		MessageBox(_T("请先打开游戏"));
+		return FAILURE;
+	}
+
+	//获取进程id
+	DWORD lldProcessId;
+	GetWindowThreadProcessId(hwndLlk, &lldProcessId);
+	//打开指定进程
+	HANDLE handleLlkProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, lldProcessId);
+	DWORD chessNumber = 0;
+	DWORD byteReadNum = 0;
+
+	//0x00174DDC,0x0018C738,
+	ReadProcessMemory(handleLlkProcess, (LPCVOID)0x00174DDC, &chessNumber, 1, &byteReadNum);
+	if (0 == byteReadNum)
+	{
+		MessageBox(_T("读取棋子个数失败"));
+		return FAILURE;
+	}
+	//关闭进程句柄
+	CloseHandle(handleLlkProcess);
+	return chessNumber;
+}
+
+
+void CQqLlkPlugDlg::OnBnClickedBtnReadchessnumber()
+{
+	DWORD chessNumber = 0;
+	if (FAILURE == (chessNumber = GetChessDataNum()))
+	{
+		return;
+	}
+	TCHAR tmpNumber[8] = { 0 };
+	_itow_s(chessNumber, tmpNumber, 10 );
+	MessageBox(tmpNumber);
+
+}
+
+void CQqLlkPlugDlg::CancelCountDown()
+{
+
+	HWND  hwndLlk = FindQqLlkWindows();
+	if (NULL == hwndLlk)
+	{
+		MessageBox(_T("请先打开游戏"));
+		return ;
+	}
+
+	//获取进程id
+	DWORD lldProcessId;
+	GetWindowThreadProcessId(hwndLlk, &lldProcessId);
+	//打开指定进程
+	HANDLE handleLlkProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, lldProcessId);
+	byte nop[] = {0x90,0x90,0x90,0x90,0x90,0x90};
+	DWORD byteWriteNum = 0;
+
+	///通过修改代码实现取消倒计时逻辑
+	//0x0041DE8D  代码基地址
+	WriteProcessMemory(handleLlkProcess, (LPVOID)0x0041DE8D, nop, 6, &byteWriteNum);
+	if (0 == byteWriteNum)
+	{
+		MessageBox(_T("写入指令失败"));
+		return ;
+	}
+	//关闭进程句柄
+	CloseHandle(handleLlkProcess);
+	
+}
+
+
+void CQqLlkPlugDlg::OnBnClickedBtnCountdown()
+{
+	CancelCountDown();
+}
+
+
+void CQqLlkPlugDlg::OnBnClickedChkGametop()
+{
+	UpdateData();
+	HWND hwndLlk = FindQqLlkWindows();
+	
+	if (NULL == hwndLlk)
+	{
+		MessageBox(_T("请先打开游戏"));
+		return;
+	}
+	if (m_gameTop) 
+	{
+		::SetWindowPos(hwndLlk, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+	}
+	else
+	{
+		::SetWindowPos(hwndLlk, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+	}
+}
+
+
+void CQqLlkPlugDlg::OnBnClickedChkSpeed()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	UpdateData();
+	if (m_speed)
+	{
+		m_sliderSpeed.EnableWindow(true);
+	}
+	else
+	{
+		m_sliderSpeed.EnableWindow(false);
+	}
+}
+
+
+void CQqLlkPlugDlg::OnNMReleasedcaptureSliderSpeed(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	*pResult = 0;
+
+	m_gameSpeed = m_sliderSpeed.GetPos();
+	
+}
+
+void CQqLlkPlugDlg::OnBnClickedChkHangUp()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	UpdateData();
+
+
+	if (m_autoHangUp)
+	{
+		SetTimer(GAME_PLAY_TIMER, m_gameSpeed, NULL);
+	}
+	else
+	{
+		KillTimer(GAME_PLAY_TIMER);
+	}
+}
+
+
+void CQqLlkPlugDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if (nIDEvent == GAME_TIMER)
+	{//游戏开局定时器
+
+		HWND hwndLlk = FindQqLlkWindows();
+		if (m_gameTop)
+		{
+			::SetWindowPos(hwndLlk, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+		}
+		else
+		{
+			::SetWindowPos(hwndLlk, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+		}
+	
+		///游戏开局标识
+		DWORD gameStartFlag = 0;
+		
+		if (FAILURE == (gameStartFlag = GetGameStartFlag()))
+		{
+			return;
+		}
+
+		if (gameStartFlag == 0)
+		{
+			StartGame();
+		}
+	}
+	else if (nIDEvent == GAME_PLAY_TIMER)
+	{//游戏进行定时器
+		ClearPair();
+	}
+
+
+	CDialogEx::OnTimer(nIDEvent);
+}
+
+
+void CQqLlkPlugDlg::OnBnClickedChkStartgame()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	UpdateData();
+
+	if (m_autoStart)
+	{
+		SetTimer(GAME_TIMER, 5000, NULL);
+	}
+	else
+	{
+		KillTimer(GAME_TIMER);
+	}
 }

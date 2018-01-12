@@ -6,6 +6,7 @@
 #include "afxwin.h"
 #include "GameData.h"
 #include "GameConstants.h"
+#include "afxcmn.h"
 // CQqLlkPlugDlg 对话框
 class CQqLlkPlugDlg : public CDialogEx
 {
@@ -40,6 +41,11 @@ protected:
 	//获取游戏开局标识
 	DWORD GetGameStartFlag();
 
+	//获取棋子数
+	DWORD GetChessDataNum();
+
+	//取消倒计时
+	void CancelCountDown();
 
 	//开局游戏
 	void StartGame();
@@ -57,15 +63,40 @@ protected:
 	void ClickPair(CBeePoint p1, CBeePoint p2);
 public:
 
-	BOOL m_autoStart;   //
+	
 	afx_msg void OnBnClickedBtnStartgame();
 	afx_msg void OnBnClickedBtnReadstartflag();
+
+
+	afx_msg void OnBnClickedBtnReadchessdata();
+	afx_msg void OnBnClickedBtnSingleclear();
+	afx_msg void OnBnClickedBtnReadchessnumber();
+	afx_msg void OnBnClickedBtnCountdown();
+	afx_msg void OnBnClickedChkSpeed();
+	afx_msg void OnNMReleasedcaptureSliderSpeed(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnBnClickedChkGametop();
+	afx_msg void OnBnClickedChkHangUp();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnBnClickedChkStartgame();
+
 
 	// 开局按钮
 	CButton m_btnStartGame;
 	//棋盘数据
 	byte m_chessData[CHESS_V_NUM][CHESS_H_NUM];//a[y][x]
-
-	afx_msg void OnBnClickedBtnReadchessdata();
-	afx_msg void OnBnClickedBtnSingleclear();
+	BOOL m_autoStart;   //自动开局标识
+	// 游戏置顶标识
+	BOOL m_gameTop;
+	
+	// 挂机速度
+	BOOL m_speed;
+	
+	CSliderCtrl m_sliderSpeed;
+	///游戏挂机速度
+	DWORD m_gameSpeed;  
+	CButton m_ctrlSpeed;
+	// 自动挂机
+	BOOL m_autoHangUp;
+	
+	
 };
