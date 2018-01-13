@@ -204,8 +204,8 @@ DWORD CQqLlkPlugDlg::GetGameStartFlag()
 	DWORD gameStartFlag;
 	DWORD byteReadNum = 0 ;
 
-	//0x0018A4C8,0x0018A4CC,
-	ReadProcessMemory(handleLlkProcess, (LPCVOID)0x0018A4C8,&gameStartFlag,4 , &byteReadNum);
+	//0x07D7AF18,0x07D7B078,0x07D7B128,0x07D7B1D8
+	ReadProcessMemory(handleLlkProcess, (LPCVOID)0x07D7AF18,&gameStartFlag,4 , &byteReadNum);
 	if (0 == byteReadNum)
 	{
 		MessageBox(_T("开局标识读取失败."));
@@ -686,7 +686,17 @@ void CQqLlkPlugDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 	else if (nIDEvent == GAME_PLAY_TIMER)
 	{//游戏进行定时器
+		if (FAILURE == ReadChessData())
+		{
+			return;
+		}
 		ClearPair();
+		DWORD chessNumber = GetChessDataNum();
+		if (FAILURE == chessNumber || chessNumber == 0)
+		{
+			return;
+		}
+		
 	}
 
 
